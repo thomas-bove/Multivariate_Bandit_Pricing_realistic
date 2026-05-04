@@ -174,6 +174,7 @@ def run_one(
         bpe_beta_use_active_count=bool(EXP_CFG.dms_bpe_beta_use_active_count),
         noise_R=EXP_CFG.dms_bpe_noise_R,
         bpe_use_global_history=bool(EXP_CFG.dms_bpe_use_global_history),
+        within_batch_ucb_c=float(EXP_CFG.dms_bpe_within_batch_ucb_c),
     )
     kl  = KleinbergUCB(ALL_ACTIONS_NORM, seed=seed * 31 + 4)
     uni = UnivariateBaseline(
@@ -403,6 +404,7 @@ def run_one_single_algorithm(
             bpe_beta_use_active_count=bool(EXP_CFG.dms_bpe_beta_use_active_count),
             noise_R=EXP_CFG.dms_bpe_noise_R,
             bpe_use_global_history=bool(EXP_CFG.dms_bpe_use_global_history),
+            within_batch_ucb_c=float(EXP_CFG.dms_bpe_within_batch_ucb_c),
         )
     elif algorithm == JOINT_CONT_GP_UCB_ALG:
         _li_sched_joint = li_22_bpe_batch_sizes(T)
@@ -655,6 +657,7 @@ def run_one_two_joint(
         bpe_beta_use_active_count=bool(cfg.dms_bpe_beta_use_active_count),
         noise_R=cfg.dms_bpe_noise_R,
         bpe_use_global_history=bool(cfg.dms_bpe_use_global_history),
+        within_batch_ucb_c=float(cfg.dms_bpe_within_batch_ucb_c),
     )
     _li_sched_joint = li_22_bpe_batch_sizes(T)
     joint_gp_ucb = DMSGPUCB(
@@ -814,6 +817,7 @@ def run_bpe_x0_only_trace(
         bpe_beta_use_active_count=bool(cfg.dms_bpe_beta_use_active_count),
         noise_R=cfg.dms_bpe_noise_R,
         bpe_use_global_history=bool(cfg.dms_bpe_use_global_history),
+        within_batch_ucb_c=float(cfg.dms_bpe_within_batch_ucb_c),
     )
     surv_trace: list[int] = []
     bpe_opt_still_active_per_round: list[float] = []

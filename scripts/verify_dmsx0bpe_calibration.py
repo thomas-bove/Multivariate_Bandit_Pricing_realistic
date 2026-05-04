@@ -163,6 +163,7 @@ agent  = _DiagBPE(
     bpe_beta_use_active_count=bool(EXP_CFG.dms_bpe_beta_use_active_count),
     noise_R=EXP_CFG.dms_bpe_noise_R,
     bpe_use_global_history=bool(EXP_CFG.dms_bpe_use_global_history),
+    within_batch_ucb_c=float(EXP_CFG.dms_bpe_within_batch_ucb_c),
     opt_arm_idx=opt_idx,
 )
 

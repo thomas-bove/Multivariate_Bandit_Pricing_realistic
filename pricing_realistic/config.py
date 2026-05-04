@@ -99,7 +99,7 @@ MARKERS = {
 #   CFG = paired_config(n_products=8, n_actions=7, n_baskets=20)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ``n_actions=5``, ``n_products=6`` ⇒ ``5^6 = 15625`` vertices = **full** uniform ε-net on margins.
+# ``n_actions=5``, ``n_products=4`` ⇒ ``5^4 = 625`` vertices = **full** uniform ε-net on margins.
 # **Not** Smolyak.  ``mc_ep * n_baskets = 2000*10`` ⇒ 20_000 MC/cell.
 CFG = paired_config(
     n_products=6,
@@ -275,18 +275,19 @@ class BanditExperimentConfig:
         the played price (diagnostic only; **not** for published experiments).
     """
 
-    dms_rkhs_norm               : float = 1.5
-    dms_elimination_delta       : float = 0.30
+    dms_rkhs_norm               : float = 1.3   # just above empirical ‖J‖_H ≈ 1.286 (subsample)
+    dms_elimination_delta       : float = 0.50  # more aggressive than 0.30 → smaller log term
     dms_bpe_noise_var           : float = 0.005
-    dms_kernel_L                : float = 1.0  # consider 0.5: k_adj drops 0.78→0.61 (H3/DiagC)
+    dms_kernel_L                : float = 1.0
     joint_reward_mc_replications: int = 1
     hgp_kernel_L                : float = 1.0
     dms_gp_noise_use_auto       : bool = False
-    dms_bpe_beta_use_active_count: bool = False
+    dms_bpe_beta_use_active_count: bool = True  # β shrinks with active set → cascading elimination
     dms_bpe_prior_mean          : float = 0.24  # empirical mean J_norm=0.245 (H2 confirmed)
     oracle_feedback_for_debug : bool = False
-    dms_bpe_noise_R           : Optional[float] = None
+    dms_bpe_noise_R           : Optional[float] = 0.05  # noise_factor=0.707 → √β≈4.5 (was 6.2)
     dms_bpe_use_global_history: bool = True
+    dms_bpe_within_batch_ucb_c: float = 0.5    # UCB-within-batch: exploits good arms immediately
 
 
 EXP_CFG = BanditExperimentConfig()

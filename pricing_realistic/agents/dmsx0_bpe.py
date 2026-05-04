@@ -61,6 +61,7 @@ class DMSX0BPE:
         noise_R   : Optional[float] = None,
         bpe_use_global_history: bool = True,
         compute_full_posterior_for_debug: bool = False,
+        within_batch_ucb_c: float = 0.0,
     ):
         self.actions    = np.asarray(actions, dtype=float)
         self.T          = int(T)
@@ -77,6 +78,7 @@ class DMSX0BPE:
             self._noise_factor = 1.0
         else:
             self._noise_factor = float(noise_R) / float(np.sqrt(lam_reg))
+        self._within_batch_ucb_c = float(within_batch_ucb_c)
         self._rng       = np.random.default_rng(seed)
         self._kfn       = lambda X, Y: _matern12_product(X, Y, kernel_L)
 
@@ -134,33 +136,39 @@ class DMSX0BPE:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Posterior mean / std at ``query_idx`` (``k_Π``, λ); fixed prior mean ``prior_mean`` on y."""
         y = np.asarray(y, dtype=float)
-        m = len(train_idx)
         nq = len(query_idx)
-        lam = self.noise_var + self._JITTER
-        if m == 0:
+        if len(train_idx) == 0:
             return np.full(nq, self.prior_mean), np.ones(nq)
 
         y_work = y - self.prior_mean
-        X_tr = self.actions[train_idx]
-        K_mm = self._kfn(X_tr, X_tr) + lam * np.eye(m)
+
+        # Aggregate duplicate arm pulls: mean reward, noise ∝ λ/count.
+        # Prevents near-singular K_mm when UCB repeatedly pulls the same arm.
+        idx_arr = np.array(train_idx, dtype=int)
+        unique_idx, inv_idx, counts = np.unique(idx_arr, return_inverse=True, return_counts=True)
+        m = len(unique_idx)
+        y_agg = np.zeros(m, dtype=float)
+        np.add.at(y_agg, inv_idx, y_work)
+        y_agg /= counts
+        lam_diag = self.noise_var / counts.astype(float) + self._JITTER
+
+        X_tr = self.actions[unique_idx]
+        K_mm = self._kfn(X_tr, X_tr) + np.diag(lam_diag)
         X_q = self.actions[np.asarray(query_idx, dtype=int)]
         K_q = self._kfn(X_tr, X_q)
 
         try:
             Lch = np.linalg.cholesky(K_mm)
-            alpha = np.linalg.solve(Lch.T, np.linalg.solve(Lch, y_work))
+            alpha = np.linalg.solve(Lch.T, np.linalg.solve(Lch, y_agg))
             tmp = np.linalg.solve(Lch, K_q)
             S = np.linalg.solve(Lch.T, tmp)
         except np.linalg.LinAlgError:
             Kinv = np.linalg.solve(K_mm + np.eye(m) * 1e-4, np.eye(m))
-            alpha = Kinv @ y_work
+            alpha = Kinv @ y_agg
             S = Kinv @ K_q
 
         mu = (K_q.T @ alpha).ravel() + self.prior_mean
-        # Assumes k(x,x) = 1 (holds for the product Matérn-1/2 with signal_variance=1,
-        # i.e. _matern12_product as currently implemented). If _matern12_product is ever
-        # extended with a signal variance ≠ 1, replace the 1.0 with the diagonal of the
-        # prior kernel evaluated at X_q: k_prior = np.diag(self._kfn(X_q, X_q)).
+        # Assumes k(x,x) = 1 for the product Matérn-1/2 with signal_variance=1.
         var = np.maximum(1.0 - np.sum(K_q * S, axis=0), 0.0)
         return mu, np.sqrt(var)
 
@@ -195,44 +203,61 @@ class DMSX0BPE:
 
     def _arm_max_sigma_active(self) -> int:
         """
-        Max posterior σ among actives **eligible for this batch step**.
+        Select the next arm to pull within the current batch.
 
-        Within a Li–Scarlett batch we prefer not to repeat an arm until every currently active
-        arm has been pulled at least once in this batch (matches Algorithm~1 set accumulation:
-        ``S_i ← S_i ∪ {x_t}`` without redundant duplicates while unexplored actives remain).
+        **Pure max-σ mode** (``within_batch_ucb_c == 0``, original Li–Scarlett):
+        Picks the arm with maximum posterior σ.  Avoids duplicate pulls until every active arm
+        has been pulled once in this batch (Algorithm 1 set accumulation).  Within-batch GP
+        training uses fantasy ``y = prior_mean`` for current-batch locations.
 
-        * ``bpe_use_global_history=False`` (default): train only on **current batch** locations,
-          with fantasy ``y = prior_mean`` everywhere (batch-local exploration, Li–Scarlett).
-        * ``bpe_use_global_history=True``: global history ∪ batch locations; fantasy ``y`` on
-          the still-uncommitted batch rows only.
-
-        Posterior σ is evaluated only on the **query** set (available ∪ fallback to all active);
-        elimination still uses all actives (see ``_eliminate``).
+        **UCB-within-batch mode** (``within_batch_ucb_c > 0``):
+        Picks the arm with maximum ``μ + c·σ`` across *all* active arms (no no-duplicate
+        constraint).  Within-batch GP training uses **real** observed rewards (not fantasy),
+        so the posterior mean updates immediately after each pull.  This concentrates pulls on
+        high-value arms discovered early, dramatically reducing cumulative regret.
         """
         self._repair_empty_active()
         active = np.where(self._active_mask)[0].astype(int)
-        already = {int(i) for i in self._batch_intr_idx}
-        available = np.array(
-            [int(a) for a in active if int(a) not in already],
-            dtype=int,
-        )
-        query_set = available if len(available) > 0 else active
+        ucb_mode = self._within_batch_ucb_c > 0
+
+        if ucb_mode:
+            query_set = active
+        else:
+            already = {int(i) for i in self._batch_intr_idx}
+            available = np.array(
+                [int(a) for a in active if int(a) not in already],
+                dtype=int,
+            )
+            query_set = available if len(available) > 0 else active
 
         if self._bpe_use_global_history:
             train_idx = list(self._all_train_idx) + list(self._batch_intr_idx)
             if len(train_idx) == 0:
                 return int(self._rng.choice(query_set))
-            y_parts = list(self._all_rewards) + [self.prior_mean] * len(self._batch_intr_idx)
+            if ucb_mode:
+                # Real rewards: GP mean is accurate, making UCB scores meaningful
+                y_parts = list(self._all_rewards) + list(self._batch_intr_rewards)
+            else:
+                y_parts = list(self._all_rewards) + [self.prior_mean] * len(self._batch_intr_idx)
             y = np.asarray(y_parts, dtype=float)
         else:
             train_idx = list(self._batch_intr_idx)
             if len(train_idx) == 0:
                 return int(self._rng.choice(query_set))
-            y = np.full(len(train_idx), self.prior_mean, dtype=float)
+            if ucb_mode:
+                y = np.asarray(self._batch_intr_rewards, dtype=float)
+            else:
+                y = np.full(len(train_idx), self.prior_mean, dtype=float)
 
-        _mu, sig = self._gp_mu_sigma_vectors(train_idx, y, query_set.astype(int))
-        smax = float(np.max(sig))
-        cands = query_set[sig >= smax - 1e-12]
+        mu, sig = self._gp_mu_sigma_vectors(train_idx, y, query_set.astype(int))
+
+        if ucb_mode:
+            scores = mu + self._within_batch_ucb_c * sig
+        else:
+            scores = sig
+
+        smax = float(np.max(scores))
+        cands = query_set[scores >= smax - 1e-12]
         return int(self._rng.choice(cands))
 
     def _eliminate(self) -> None:
