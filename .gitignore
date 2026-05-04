@@ -1,0 +1,5 @@
+.venv_ci/
+__pycache__/
+*.py[cod]
+.mpl_cache/
+results_realistic_test_run/
