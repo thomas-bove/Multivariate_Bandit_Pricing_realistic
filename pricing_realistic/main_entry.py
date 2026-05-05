@@ -42,6 +42,7 @@ from .plots import (
     _plot_bpe_recommendation_simple_regret_pdf,
     _plot_heatmaps,
     _plot_regret,
+    _plot_regret_per_pair,
     _plot_simple_regret,
     _print_summary,
     simple_regret_plot_source,
@@ -287,7 +288,7 @@ def main():
 
     df = _add_best_simple_regret(df)
     if not _skip_plots:
-        _plot_regret(df, BASE, N_SEEDS)
+        _plot_regret_per_pair(df, env, opt_action_real, BASE, N_SEEDS)
         _emit_simple_regret_figures(df, BASE, N_SEEDS)
         _plot_heatmaps(df, env, demands, opt_action_real, BASE)
     else:
@@ -395,7 +396,7 @@ def main_single_agent(algorithm: str) -> None:
 
     df = _add_best_simple_regret(df)
     if not _skip_plots:
-        _plot_regret(df, BASE, N_SEEDS)
+        _plot_regret_per_pair(df, env, opt_action_real, BASE, N_SEEDS)
         _emit_simple_regret_figures(df, BASE, N_SEEDS)
         if PROPOSED_JOINT_ALG in set(df["algorithm"].values):
             _plot_bpe_recommendation_simple_regret_pdf(df, BASE, N_SEEDS)

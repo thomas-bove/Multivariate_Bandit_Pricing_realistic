@@ -14,6 +14,7 @@ from .config import (
     ALPHA,
     EXP_CFG,
     BanditExperimentConfig,
+    ISO_MATERN_BPE_ALG,
     ISO_MATERN_GP_UCB_ALG,
     JOINT_CONT_GP_UCB_ALG,
     NOISE_VAR,
@@ -33,6 +34,7 @@ from .rewards import (
 )
 from .config import effective_gp_noise_variance
 from .agents.dmsx0_bpe import DMSX0BPE, li_22_bpe_batch_sizes
+from .agents.dmsx0_bpe_iso import IsoMatern12BPE
 from .agents.dmsgp_ucb import DMSGPUCB, IsotropicMatern12GPUCB
 from .agents.kleinberg_ucb import KleinbergUCB
 from .agents.univariate import UnivariateBaseline
@@ -240,6 +242,20 @@ def run_one(
         seed=seed * 31 + 17,
     )
 
+    iso_bpe = IsoMatern12BPE(
+        ALL_ACTIONS_NORM,
+        T=T,
+        noise_var=lam_gp,
+        delta=float(EXP_CFG.dms_elimination_delta),
+        kernel_L=k_l,
+        B_rkhs=float(B_rkhs),
+        seed=seed * 31 + 7,
+        bpe_beta_use_active_count=bool(EXP_CFG.dms_bpe_beta_use_active_count),
+        noise_R=EXP_CFG.dms_bpe_noise_R,
+        bpe_use_global_history=bool(EXP_CFG.dms_bpe_use_global_history),
+        within_batch_ucb_c=float(EXP_CFG.dms_bpe_within_batch_ucb_c),
+    )
+
     records = []
     cum = {alg: 0.0 for alg in ALL_ALGS}
 
@@ -291,10 +307,16 @@ def run_one(
         s_uni   = env.step(m_uni)
         uni.update(m_uni * np.mean(s_uni, axis=1))
 
+        # BPE-Iso-Mat12: ablation — same BPE, isotropic Matérn-1/2 kernel
+        a_ibpe  = iso_bpe.pull(snap_fn=snap_to_grid)
+        m_ibpe  = norm_to_real(a_ibpe)
+        iso_bpe.update(float(mean_joint_reward_replicated(env, m_ibpe, R_mc)))
+
         true_vals = {
             PROPOSED_JOINT_ALG: env.compute_givenaction_value(m_dmsx),
             JOINT_CONT_GP_UCB_ALG: env.compute_givenaction_value(m_jgp),
             ISO_MATERN_GP_UCB_ALG: env.compute_givenaction_value(m_iso),
+            ISO_MATERN_BPE_ALG : env.compute_givenaction_value(m_ibpe),
             "HGP-UCB-CPP"      : env.compute_givenaction_value(m_hgp),
             "BZ-ETC"           : env.compute_givenaction_value(m_bz),
             "SPSA"             : env.compute_givenaction_value(m_spsa),
@@ -305,6 +327,7 @@ def run_one(
             PROPOSED_JOINT_ALG: a_dmsx,
             JOINT_CONT_GP_UCB_ALG: a_jgp,
             ISO_MATERN_GP_UCB_ALG: a_iso,
+            ISO_MATERN_BPE_ALG : a_ibpe,
             "HGP-UCB-CPP"      : a_hgp,
             "BZ-ETC"           : a_bz,
             "SPSA"             : a_spsa,
@@ -383,6 +406,7 @@ def run_one_single_algorithm(
     dms_x0: Optional[DMSX0BPE] = None
     joint_gp_ucb: Optional[DMSGPUCB] = None
     iso_gp_ucb: Optional[IsotropicMatern12GPUCB] = None
+    iso_bpe: Optional[IsoMatern12BPE] = None
     hgp: Optional[HGP_UCB_CPP_Wrapper] = None
     bz: Optional[BZ_ETC] = None
     spsa: Optional[SPSAPricing] = None
@@ -435,6 +459,21 @@ def run_one_single_algorithm(
             batch_ratio=2.0,
             n_restarts=max(24, 12 * N_PRODUCTS),
             li_scarlett_batch_sizes=_li_sched_joint,
+        )
+    elif algorithm == ISO_MATERN_BPE_ALG:
+        validate_full_cartesian_x0(ALL_ACTIONS_NORM, N_PRODUCTS, N_ACTIONS)
+        iso_bpe = IsoMatern12BPE(
+            ALL_ACTIONS_NORM,
+            T=T,
+            noise_var=lam_gp,
+            delta=float(EXP_CFG.dms_elimination_delta),
+            kernel_L=k_l,
+            B_rkhs=float(B_rkhs),
+            seed=seed * 31 + 7,
+            bpe_beta_use_active_count=bool(EXP_CFG.dms_bpe_beta_use_active_count),
+            noise_R=EXP_CFG.dms_bpe_noise_R,
+            bpe_use_global_history=bool(EXP_CFG.dms_bpe_use_global_history),
+            within_batch_ucb_c=float(EXP_CFG.dms_bpe_within_batch_ucb_c),
         )
     elif algorithm == "HGP-UCB-CPP":
         hgp = HGP_UCB_CPP_Wrapper(
@@ -498,6 +537,13 @@ def run_one_single_algorithm(
             a_play = iso_gp_ucb.pull(snap_fn=snap_to_grid)
             m_play = norm_to_real(a_play)
             iso_gp_ucb.update(mean_joint_reward_replicated(env, m_play, R_mc))
+            true_val = float(env.compute_givenaction_value(m_play))
+        elif algorithm == ISO_MATERN_BPE_ALG:
+            assert iso_bpe is not None
+            a_play = iso_bpe.pull(snap_fn=snap_to_grid)
+            m_play = norm_to_real(a_play)
+            r_step = float(mean_joint_reward_replicated(env, m_play, R_mc))
+            iso_bpe.update(r_step)
             true_val = float(env.compute_givenaction_value(m_play))
         elif algorithm == "HGP-UCB-CPP":
             assert hgp is not None

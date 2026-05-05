@@ -58,10 +58,14 @@ JOINT_CONT_GP_UCB_ALG = "Joint-DMS-GP-UCB"
 # Isotropic Matérn-1/2 GP-UCB in ℝ^d (same UCB/β/γ machinery, single exponential of ‖Δ‖₂).
 ISO_MATERN_GP_UCB_ALG = "GP-UCB-Iso-Mat12"
 
+# BPE (Li–Scarlett) with isotropic Matérn-1/2 kernel — ablation baseline.
+ISO_MATERN_BPE_ALG = "BPE-Iso-Mat12"
+
 ALL_ALGS = [
     PROPOSED_JOINT_ALG,
     JOINT_CONT_GP_UCB_ALG,
     ISO_MATERN_GP_UCB_ALG,
+    ISO_MATERN_BPE_ALG,
     "HGP-UCB-CPP",
     "BZ-ETC",
     "SPSA",
@@ -69,24 +73,26 @@ ALL_ALGS = [
     "Univariate",
 ]
 COLORS = {
-    PROPOSED_JOINT_ALG : "#1f77b4",
+    PROPOSED_JOINT_ALG    : "#1f77b4",
     JOINT_CONT_GP_UCB_ALG : "#17becf",
     ISO_MATERN_GP_UCB_ALG : "#7f7f7f",
-    "HGP-UCB-CPP"      : "#9467bd",
-    "BZ-ETC"           : "#e377c2",
-    "SPSA"             : "#8c564b",
-    "Kleinberg"        : "#2ca02c",
-    "Univariate"      : "#d62728",
+    ISO_MATERN_BPE_ALG    : "#ff7f0e",
+    "HGP-UCB-CPP"         : "#9467bd",
+    "BZ-ETC"              : "#e377c2",
+    "SPSA"                : "#8c564b",
+    "Kleinberg"           : "#2ca02c",
+    "Univariate"          : "#d62728",
 }
 MARKERS = {
-    PROPOSED_JOINT_ALG : "o",
+    PROPOSED_JOINT_ALG    : "o",
     JOINT_CONT_GP_UCB_ALG : "v",
     ISO_MATERN_GP_UCB_ALG : "s",
-    "HGP-UCB-CPP"      : "P",
-    "BZ-ETC"           : "X",
-    "SPSA"             : "*",
-    "Kleinberg"        : "^",
-    "Univariate"      : "D",
+    ISO_MATERN_BPE_ALG    : "D",
+    "HGP-UCB-CPP"         : "P",
+    "BZ-ETC"              : "X",
+    "SPSA"                : "*",
+    "Kleinberg"           : "^",
+    "Univariate"          : "d",
 }
 
 

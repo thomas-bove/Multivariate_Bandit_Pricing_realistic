@@ -414,3 +414,119 @@ def _print_summary(df):
                 ss = float(sub["final_commit_simple_regret"].std()) if len(sub) > 1 else 0.0
                 print(f"  {PROPOSED_JOINT_ALG}  T={T:5.0f}   final_commit_sr={mm:.4f} ± {ss:.4f}")
 
+
+def _plot_regret_per_pair(
+    df: pd.DataFrame,
+    env: ComplementaryPricingEnvironment,
+    opt_action_real: np.ndarray,
+    base: str,
+    n_seeds: int,
+) -> None:
+    """
+    Per-pair cumulative regret — two separate PDFs.
+
+    For each leader-follower pair (L, F) and each round t:
+        pair_regret_t = J(p*) - J(ã_t)
+    where ã_t equals p* on all coordinates except L and F, which take the
+    algorithm's played values.
+
+    PDF 1 (regret_pair_solo.pdf): single panel for the first pair.
+    PDF 2 (regret_pairs_combined.pdf): single panel whose y-axis is the
+        element-wise sum of the instantaneous pair regrets for the remaining
+        two pairs, then cumulated — i.e. the combined contribution of those
+        pairs as if they were one.
+    """
+    df = _df_learning_only(df)
+    T_max = int(df["T"].max())
+    sub_all = df[df["T"] == T_max].copy()
+
+    pairs = [(ldr, flw[0]) for ldr, flw in sorted(GRAPH_DICT.items())]
+    algs  = _ordered_algorithms_in_df(df)
+    opt   = float(env.compute_best_action_value())
+
+    # Pre-compute 5×5 value tables for every pair
+    val_tables: dict[tuple[int, int], np.ndarray] = {}
+    for leader, follower in pairs:
+        vt = np.zeros((N_ACTIONS, N_ACTIONS))
+        for i, ml in enumerate(MARGIN_VALS):
+            for j, mf in enumerate(MARGIN_VALS):
+                a = opt_action_real.copy()
+                a[leader]   = ml
+                a[follower] = mf
+                vt[i, j] = env.compute_givenaction_value(a)
+        val_tables[(leader, follower)] = vt
+
+    def _seed_curves(alg_df: pd.DataFrame, leader: int, follower: int) -> list[np.ndarray]:
+        curves: list[np.ndarray] = []
+        vt = val_tables[(leader, follower)]
+        for _, seed_df in alg_df.groupby("seed"):
+            seed_df = seed_df.sort_values("t")
+            idx_L = np.round(
+                seed_df[f"a{leader}"].values * (N_ACTIONS - 1)
+            ).astype(int).clip(0, N_ACTIONS - 1)
+            idx_F = np.round(
+                seed_df[f"a{follower}"].values * (N_ACTIONS - 1)
+            ).astype(int).clip(0, N_ACTIONS - 1)
+            curves.append(np.cumsum(opt - vt[idx_L, idx_F]))
+        return curves
+
+    def _draw_algs(ax, alg_seed_curves: dict[str, list[np.ndarray]]) -> None:
+        for alg in algs:
+            sc = alg_seed_curves.get(alg)
+            if not sc:
+                continue
+            curves = np.array(sc)
+            ts   = np.arange(1, curves.shape[1] + 1)
+            mean = curves.mean(axis=0)
+            std  = curves.std(axis=0)
+            n    = curves.shape[0]
+            ci   = scipy_stats.t.ppf(0.975, df=max(n - 1, 1)) * std / np.sqrt(n)
+            ax.plot(ts, mean, label=alg, color=COLORS[alg], marker=MARKERS[alg],
+                    markevery=max(len(ts) // 8, 1), markersize=5, lw=1.8)
+            ax.fill_between(ts, mean - ci, mean + ci, alpha=0.15, color=COLORS[alg])
+
+    # ── PDF 1: first pair alone ───────────────────────────────────────────────
+    leader0, follower0 = pairs[0]
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _draw_algs(ax, {alg: _seed_curves(sub_all[sub_all["algorithm"] == alg], leader0, follower0)
+                    for alg in algs})
+    ax.set_xlabel("Round $t$")
+    ax.set_ylabel("Pair cumulative regret")
+    ax.set_title(
+        rf"Pair ($p_{{{leader0}}}$ leader, $p_{{{follower0}}}$ follower) — "
+        rf"others fixed at $p^*$,  $T={T_max}$,  {n_seeds} seeds"
+    )
+    ax.legend(fontsize=8, ncol=2)
+    fig.tight_layout()
+    path1 = f"{base}/regret_pair_solo.pdf"
+    fig.savefig(path1, bbox_inches="tight"); plt.close(fig)
+    print(f"  Saved {path1}")
+
+    # ── PDF 2: combined regret of remaining pairs ─────────────────────────────
+    combined_pairs = pairs[1:]
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    combined_curves: dict[str, list[np.ndarray]] = {}
+    for alg in algs:
+        alg_df = sub_all[sub_all["algorithm"] == alg]
+        per_pair = [_seed_curves(alg_df, L, F) for L, F in combined_pairs]
+        if not per_pair or not per_pair[0]:
+            continue
+        n_s = len(per_pair[0])
+        combined_curves[alg] = [
+            sum(per_pair[p][s] for p in range(len(combined_pairs)))
+            for s in range(n_s)
+        ]
+    _draw_algs(ax, combined_curves)
+    pair_labels = " + ".join(
+        rf"($p_{{{L}}}$,$p_{{{F}}}$)" for L, F in combined_pairs
+    )
+    ax.set_xlabel("Round $t$")
+    ax.set_ylabel("Combined pair cumulative regret")
+    ax.set_title(
+        rf"Combined pairs {pair_labels} — others fixed at $p^*$,  $T={T_max}$,  {n_seeds} seeds"
+    )
+    ax.legend(fontsize=8, ncol=2)
+    fig.tight_layout()
+    path2 = f"{base}/regret_pairs_combined.pdf"
+    fig.savefig(path2, bbox_inches="tight"); plt.close(fig)
+    print(f"  Saved {path2}")

@@ -1,6 +1,7 @@
 """Bandit agents."""
 from .dmsgp_ucb import DMSGPUCB, IsotropicMatern12GPUCB
 from .dmsx0_bpe import DMSX0BPE, li_22_bpe_batch_sizes
+from .dmsx0_bpe_iso import IsoMatern12BPE
 from .kleinberg_ucb import KleinbergUCB
 from .univariate import UnivariateBaseline
 from .hgp_cpp import HGP_UCB_CPP_Wrapper
@@ -11,6 +12,7 @@ __all__ = [
     "DMSGPUCB",
     "IsotropicMatern12GPUCB",
     "DMSX0BPE",
+    "IsoMatern12BPE",
     "li_22_bpe_batch_sizes",
     "KleinbergUCB",
     "UnivariateBaseline",
