@@ -249,7 +249,7 @@ class BanditExperimentConfig:
     dms_bpe_use_global_history
         If ``True``, BPE uses **global** GP history for σ exploration and elimination (engineering
         ablation).  If ``False`` (**default**, paper-aligned), σ uses **batch-only** locations with
-        fantasy ``y = prior_mean``; elimination UCB/LCB uses **only the completed batch**.
+        fantasy ``y = 0``; elimination UCB/LCB uses **only the completed batch**.
     dms_elimination_delta
         ``δ`` in the elimination log-term.
     dms_bpe_noise_var
@@ -268,22 +268,19 @@ class BanditExperimentConfig:
     dms_bpe_beta_use_active_count
         If True (legacy), elimination ``√β`` uses ``|X_active|`` in the log-term; default **False**
         uses full ``|X°|`` (uniform confidence over the ε-cover).
-    dms_bpe_prior_mean
-        GP prior mean on **normalized** rewards for ``DMSX0BPE`` (default ``0.0``).
     oracle_feedback_for_debug
         If True, ``run_one`` feeds ``DMSX0BPE`` **noiseless** ``env.compute_givenaction_value`` at
         the played price (diagnostic only; **not** for published experiments).
     """
 
-    dms_rkhs_norm               : float = 1.3   # just above empirical ‖J‖_H ≈ 1.286 (subsample)
-    dms_elimination_delta       : float = 0.50  # more aggressive than 0.30 → smaller log term
+    dms_rkhs_norm               : float = 1.0
+    dms_elimination_delta       : float = 0.05
     dms_bpe_noise_var           : float = 0.005
     dms_kernel_L                : float = 1.0
     joint_reward_mc_replications: int = 1
     hgp_kernel_L                : float = 1.0
     dms_gp_noise_use_auto       : bool = False
     dms_bpe_beta_use_active_count: bool = True  # β shrinks with active set → cascading elimination
-    dms_bpe_prior_mean          : float = 0.24  # empirical mean J_norm=0.245 (H2 confirmed)
     oracle_feedback_for_debug : bool = False
     dms_bpe_noise_R           : Optional[float] = 0.05  # noise_factor=0.707 → √β≈4.5 (was 6.2)
     dms_bpe_use_global_history: bool = True
