@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: solo **BZ-ETC**."""
+"""CLI: only **BZ-ETC**."""
 import os
 import sys
 

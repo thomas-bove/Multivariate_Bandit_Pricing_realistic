@@ -8,8 +8,6 @@ A **fast** sanity check runs by default.  The long full-grid stress test
 Optional stress (both learners, long ``T``)::
 
     EXP_FULL_TWO_JOINT=1 python -m unittest tests.test_two_joint_learners.TestTwoJointLearners.test_full_horizon_two_joint_slow -v
-
-Reference BPE code (Li & Scarlett 2022): https://github.com/lizihan97/BPE
 """
 
 from __future__ import annotations
@@ -93,8 +91,7 @@ class TestTwoJointLearners(unittest.TestCase):
             n,
             msg=(
                 f"BPE never shrank active set (min={min(trace)}, n={n}). "
-                "Raise T or joint_reward_mc_replications, lower dms_bpe_noise_var / B_rkhs; "
-                "see https://github.com/lizihan97/BPE"
+                "Raise T or joint_reward_mc_replications, lower dms_bpe_noise_var / B_rkhs."
             ),
         )
 

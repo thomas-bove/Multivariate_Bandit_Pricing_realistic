@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: solo **GP-UCB-Iso-Mat12**."""
+"""CLI: only **GP-UCB-Iso-Mat12**."""
 import os
 import sys
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: solo **Kleinberg**."""
+"""CLI: only **Kleinberg**."""
 import os
 import sys
 

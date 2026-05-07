@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: solo **HGP-UCB-CPP**."""
+"""CLI: only **HGP-UCB-CPP**."""
 import os
 import sys
 

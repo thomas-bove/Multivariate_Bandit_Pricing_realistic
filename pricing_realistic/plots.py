@@ -27,6 +27,25 @@ from .config import (
 from .rewards import norm_to_real
 
 
+# Display-only renaming for plot labels/titles. Internal algorithm IDs (CSV column
+# `algorithm`, COLORS/MARKERS keys, run dispatch) are unchanged.
+_DISPLAY_NAMES = {
+    "DMS-X0-BPE":        "Tensorized BPE",
+    "GP-UCB-Iso-Mat12":  "Isotropic-GPUCB",
+    "BPE-Iso-Mat12":     "Isotropic BPE",
+    "HGP-UCB-CPP":       "CPP (Mussi)",
+    "Kleinberg":         "CAB1",
+}
+# Hidden from plots because not literature-supported — developer/internal
+# baseline kept in `results.csv` for reference but never shown in figures.
+_HIDE_FROM_PLOTS = {"Joint-DMS-GP-UCB"}
+
+
+def _disp(alg: str) -> str:
+    """Return the display label for an internal algorithm name."""
+    return _DISPLAY_NAMES.get(alg, alg)
+
+
 def simple_regret_plot_source() -> str:
     """
     Which instantaneous simple-regret series to plot (env ``EXP_PLOT_SIMPLE_REGRET_SOURCE``).
@@ -57,7 +76,7 @@ def _df_learning_only(df: pd.DataFrame) -> pd.DataFrame:
 def _ordered_algorithms_in_df(df: pd.DataFrame) -> list:
     """Stable legend order (same as ``ALL_ALGS``), restricted to algorithms present in ``df``."""
     present = set(df["algorithm"].unique())
-    return [a for a in ALL_ALGS if a in present]
+    return [a for a in ALL_ALGS if a in present and a not in _HIDE_FROM_PLOTS]
 
 
 def _heatmap_columns_from_df(df: pd.DataFrame) -> list:
@@ -73,8 +92,8 @@ def _heatmap_columns_from_df(df: pd.DataFrame) -> list:
         "BZ-ETC",
     ]
     present = set(df["algorithm"].unique())
-    cols = [a for a in preferred if a in present]
-    rest = sorted(a for a in present if a not in preferred)
+    cols = [a for a in preferred if a in present and a not in _HIDE_FROM_PLOTS]
+    rest = sorted(a for a in present if a not in preferred and a not in _HIDE_FROM_PLOTS)
     return cols + rest
 
 
@@ -97,7 +116,7 @@ def _plot_regret(df, base, n_seeds):
         for alg in _ordered_algorithms_in_df(df):
             mean, ci = _ci_band(sub[sub["algorithm"] == alg],
                                 "t", "regret_cumulative")
-            ax.plot(mean.index, mean.values, label=alg,
+            ax.plot(mean.index, mean.values, label=_disp(alg),
                     color=COLORS[alg], marker=MARKERS[alg],
                     markevery=max(len(mean) // 8, 1), markersize=5, lw=1.8)
             ax.fill_between(mean.index, mean.values - ci, mean.values + ci,
@@ -131,7 +150,7 @@ def _plot_simple_regret(
             mean, _ = _ci_band(sub[sub["algorithm"] == alg],
                                "t", y_col)
             ax.semilogy(mean.index, np.maximum(mean.values, 1e-6),
-                        label=alg, color=COLORS[alg], lw=1.8)
+                        label=_disp(alg), color=COLORS[alg], lw=1.8)
         ax.set_xlabel("Round $t$")
         ax.set_ylabel(y_label)
         ax.set_title(f"Complementary pricing — $d={N_PRODUCTS}$, $T={T}$, {n_seeds} seeds")
@@ -179,7 +198,7 @@ def _plot_best_simple_regret(
         mean, ci = _ci_band(sub[sub["algorithm"] == alg],
                             "t", y_col)
         ax.semilogy(mean.index, np.maximum(mean.values, 1e-6),
-                    label=alg, color=COLORS[alg], lw=1.8)
+                    label=_disp(alg), color=COLORS[alg], lw=1.8)
         ax.fill_between(mean.index,
                         np.maximum(mean.values - ci, 1e-6),
                         np.maximum(mean.values + ci, 1e-6),
@@ -188,8 +207,7 @@ def _plot_best_simple_regret(
     ax.set_ylabel(y_label)
     ax.set_title(
         f"Complementary pricing — $d={N_PRODUCTS}$, $T={T_max}$, {n_seeds} seeds\n"
-        f"{PROPOSED_JOINT_ALG} (paper: BPE + elimination on full X°) vs "
-        f"{JOINT_CONT_GP_UCB_ALG} (continuous acquisition + snap) vs baselines"
+        f"{_disp(PROPOSED_JOINT_ALG)} (paper: BPE + elimination on full X°) vs baselines"
     )
     ax.legend(fontsize=9)
     fig.tight_layout()
@@ -216,7 +234,7 @@ def _plot_bpe_recommendation_simple_regret_pdf(df: pd.DataFrame, base: str, n_se
                     color=COLORS[PROPOSED_JOINT_ALG], lw=2.0)
         ax.set_xlabel("Round $t$")
         ax.set_ylabel("BPE recommendation simple regret (diagnostic/deployment)")
-        ax.set_title(f"{PROPOSED_JOINT_ALG} — $T={T}$, {n_seeds} seeds")
+        ax.set_title(f"{_disp(PROPOSED_JOINT_ALG)} — $T={T}$, {n_seeds} seeds")
     fig.tight_layout()
     path = f"{base}/bpe_recommendation_simple_regret.pdf"
     fig.savefig(path)
@@ -247,7 +265,7 @@ def _plot_bpe_final_commit_simple_regret_pdf(df: pd.DataFrame, base: str, n_seed
     ax.set_xticklabels([str(int(t)) for t in T_LIST])
     ax.set_xlabel(r"Horizon $T$")
     ax.set_ylabel("Final commit simple regret (not included in cumulative regret)")
-    ax.set_title(f"{PROPOSED_JOINT_ALG} — final deploy evaluation ({n_seeds} seeds)")
+    ax.set_title(f"{_disp(PROPOSED_JOINT_ALG)} — final deploy evaluation ({n_seeds} seeds)")
     fig.tight_layout()
     path = f"{base}/bpe_final_commit_simple_regret.pdf"
     fig.savefig(path)
@@ -352,7 +370,7 @@ def _plot_heatmaps(df: pd.DataFrame,
             ax.set_xlabel(rf"$p_{{{leader}}}$ (leader)", fontsize=10)
             ax.set_ylabel(rf"$p_{{{follower}}}$ (follower)", fontsize=10)
             ax.set_title(
-                f"{alg} — pair ({leader},{follower}), $T={T_max}$, seed 0",
+                f"{_disp(alg)} — pair ({leader},{follower}), $T={T_max}$, seed 0",
                 fontsize=9,
             )
             ax.legend(fontsize=7, loc="upper right")
@@ -481,7 +499,7 @@ def _plot_regret_per_pair(
             std  = curves.std(axis=0)
             n    = curves.shape[0]
             ci   = scipy_stats.t.ppf(0.975, df=max(n - 1, 1)) * std / np.sqrt(n)
-            ax.plot(ts, mean, label=alg, color=COLORS[alg], marker=MARKERS[alg],
+            ax.plot(ts, mean, label=_disp(alg), color=COLORS[alg], marker=MARKERS[alg],
                     markevery=max(len(ts) // 8, 1), markersize=5, lw=1.8)
             ax.fill_between(ts, mean - ci, mean + ci, alpha=0.15, color=COLORS[alg])
 

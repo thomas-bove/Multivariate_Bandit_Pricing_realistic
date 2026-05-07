@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: solo **Joint-DMS-GP-UCB**."""
+"""CLI: only **Joint-DMS-GP-UCB**."""
 import os
 import sys
 

@@ -1,1 +1,1 @@
-# Test package for Thomas_repo experiments.
+# Test package for experiments.

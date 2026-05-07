@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""CLI: solo **SPSA**.
+"""CLI: only **SPSA**.
 
-In modalità ``EXP_SMOKE=1``, ``runs`` usa un ``a_par`` più alto (movimento visibile sul grid);
-sovrascrivi con ``EXP_SPSA_A_PAR=0.05`` (o altro) se serve.
+In ``EXP_SMOKE=1`` mode, ``runs`` uses a higher ``a_par`` (visible motion on the grid);
+override with ``EXP_SPSA_A_PAR=0.05`` (or other) if needed.
 """
 import os
 import sys
